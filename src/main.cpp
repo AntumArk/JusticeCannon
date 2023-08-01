@@ -13,10 +13,10 @@ u_int32_t sleepTimeout = 10000;
 // need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
 // ground, and power), like the LPD8806 define both DATA_PIN and CLOCK_PIN
 // Clock pin only needed for SPI based chipsets when not using hardware SPI
-#define DATA_PIN 3
+#define DATA_PIN 4
 
 // Define the array of leds
-// CRGB leds[NUM_LEDS];
+CRGB leds[NUM_LEDS];
 
 XT_Wav_Class LaserSound(laser_wav);   // create an object of type XT_Wav_Class that is used by
                                       // the dac audio class (below), passing wav data as parameter.
@@ -69,7 +69,7 @@ void setup()
   // speed is set to this speed also.
   // Uncomment/edit one of the following lines for your leds arrangement.
   // ## Clockless types ##
-  // FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
+  //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
   // FastLED.addLeds<SM16703, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<TM1829, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<TM1812, DATA_PIN, RGB>(leds, NUM_LEDS);
@@ -82,7 +82,7 @@ void setup()
   // FastLED.addLeds<UCS2903, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
   // FastLED.addLeds<WS2852, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
+   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
   // FastLED.addLeds<GS1903, DATA_PIN, RGB>(leds, NUM_LEDS);
   // FastLED.addLeds<SK6812, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
   // FastLED.addLeds<SK6822, DATA_PIN, RGB>(leds, NUM_LEDS);
@@ -109,15 +109,6 @@ void setup()
   // FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
   // FastLED.addLeds<SK9822, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
   print_wakeup_reason();
-
-  // // Turn the LED on, then pause
-  // leds[0] = CRGB::Red;
-  // FastLED.show();
-  // delay(500);
-  // // Now turn the LED off, then pause
-  // leds[0] = CRGB::Black;
-  // FastLED.show();
-  // delay(500);
 }
 
 void loop()
@@ -132,6 +123,11 @@ void loop()
 
   if (digitalRead(GPIO_NUM_32))
   {
+      // initialize the x/y and time values
+  // random16_set_seed(8934);
+  // random16_add_entropy(analogRead(3));
+
+
     lastActivity = millis();
     DacAudio.FillBuffer();           // Fill the sound buffer with data
     if (LaserSound.Playing == false) // if not playing,
@@ -139,6 +135,17 @@ void loop()
       DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
       DacAudio.Play(&GlitchSound, true);
     } //                play it, this will cause it to repeat and repeat...
+    // Turn the LED on, then pause
+    for (size_t i = 0; i < NUM_LEDS; i++)
+    {
+      leds[i] = CRGB::Cyan;
+      FastLED.show();
+      delay(50);
+      // Now turn the LED off, then pause
+      leds[i] = CRGB::Black;
+      FastLED.show();
+      delay(50);
+    }
   }
   else
   {
