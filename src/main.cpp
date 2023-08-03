@@ -237,29 +237,12 @@ void setup()
   Serial.begin(115200); // Not needed for sound, just to demo printing to the serial
   delay(1000);
 
-  // for (size_t i = 0; i < 5000; i++)
-  // {
-  //     DacAudio.FillBuffer();
-  //   if (LaserSound.Playing == false) // OLaserSound.Playing ) //
-  //   {
-  //     Serial.println("Playing Sound");
-  //     DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
-  //     DacAudio.Play(&GlitchSound, true);
-  //   }
-  //   else{
-  //     Serial.println("Already playing");
-  //   }
-  //   delay(1);
-  // }
-
-  //  Serial.println("Hi Sound");
-
   justWokeUp = true;
   triggerBtn.pressed = true;
   attachInterrupt(triggerBtn.PIN, ButtonTask, CHANGE);
 
   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS); // GRB ordering is typical
-  leds[0] = CRGB::Blue;                                    // indicate power On
+  leds[0] = CRGB::PaleVioletRed;                                    // indicate power On
   FastLED.show();
 
   print_wakeup_reason();
