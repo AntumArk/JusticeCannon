@@ -22,7 +22,6 @@ Button triggerBtn = {GPIO_NUM_32, 0, false};
 /* Tasks */
 TaskHandle_t audioTaskHandle = nullptr;
 TaskHandle_t ledTaskHandle = nullptr;
-u_int32_t taskCount = 0;
 
 /* Prototypes */
 void StartEffects();
@@ -35,15 +34,17 @@ void print_wakeup_reason();
 
 void StartEffects()
 {
-
-  // xTaskCreatePinnedToCore(
-  //     PlayAudio,
-  //     "Play audio",
-  //     10000,
-  //     nullptr,
-  //     1,
-  //     &audioTaskHandle,
-  //     1);
+  if (audioTaskHandle == nullptr)
+  {
+    xTaskCreatePinnedToCore(
+        PlayAudio,
+        "Play audio",
+        10000,
+        nullptr,
+        1,
+        &audioTaskHandle,
+        1);
+  }
   if (ledTaskHandle == nullptr)
   {
     xTaskCreatePinnedToCore(
@@ -59,22 +60,22 @@ void StartEffects()
 
 void PlayAudio(void *parameter)
 {
-
   Serial.println("Starting Sound");
-  taskCount++;
-  Serial.println(taskCount);
   DacAudio.FillBuffer();
-  if (LaserSound.Playing == false) // OLaserSound.Playing ) //
+  DacAudio.Play(&LaserSound);
+  DacAudio.Play(&GlitchSound, true);
+
+  while (LaserSound.Playing == true)
   {
     Serial.println("Playing Sound");
-    DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
-    DacAudio.Play(&GlitchSound, true);
-    vTaskDelay(10); /// portTICK_PERIOD_MS);
+    DacAudio.FillBuffer();
+    vTaskDelay(1 / portTICK_PERIOD_MS);
   }
 
   Serial.println("Ending Sound");
   DacAudio.StopAllSounds();
 
+  audioTaskHandle = nullptr;
   // When you're done, call vTaskDelete. Don't forget this!
   vTaskDelete(nullptr);
 }
@@ -111,7 +112,7 @@ void IRAM_ATTR ButtonTask()
 {
 
   triggerBtn.numberKeyPresses++;
-  triggerBtn.pressed = !triggerBtn.pressed || justWokeUp; // Switch so it would disable tasks on let go
+  triggerBtn.pressed = digitalRead(triggerBtn.PIN); // Switch so it would disable tasks on let go
   justWokeUp = false;
   if (triggerBtn.pressed)
   {
@@ -122,17 +123,17 @@ void IRAM_ATTR ButtonTask()
   {
     // Stop tasks
     // vTaskDelete(audioTaskHandle);
-    if (ledTaskHandle != nullptr)
-    {
-      eTaskState ledState = eTaskGetState(ledTaskHandle);
-      if(ledState!=eDeleted)
-        {
-          vTaskDelete(ledTaskHandle);
-          ledTaskHandle = nullptr;
-        }
-    }
+    // if (ledTaskHandle != nullptr)
+    // {
+    //   eTaskState ledState = eTaskGetState(ledTaskHandle);
+    //   if (ledState != eDeleted)
+    //   {
+    //     vTaskDelete(ledTaskHandle);
+    //     ledTaskHandle = nullptr;
+    //   }
+    // }
     // Serial.println("Ending Sound");
-    //  DacAudio.StopAllSounds();
+    DacAudio.StopAllSounds();
   }
 }
 
@@ -144,6 +145,12 @@ void SleepTask(void *parameter)
     {
       esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1); // 1 = High, 0 = Low
       Serial.println("Going to sleep");
+      for (size_t i = 0; i < NUM_LEDS; i++)
+      {
+        // Now turn the LED off, then pause
+        leds[i] = CRGB::Black;
+        FastLED.show();
+      }
       esp_deep_sleep_start();
       vTaskDelete(nullptr);
     }
@@ -185,13 +192,34 @@ void print_wakeup_reason()
 
 void setup()
 {
+
   Serial.begin(115200); // Not needed for sound, just to demo printing to the serial
   delay(1000);
-  justWokeUp = true;
 
+  // for (size_t i = 0; i < 5000; i++)
+  // {
+  //     DacAudio.FillBuffer();
+  //   if (LaserSound.Playing == false) // OLaserSound.Playing ) //
+  //   {
+  //     Serial.println("Playing Sound");
+  //     DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
+  //     DacAudio.Play(&GlitchSound, true);
+  //   }
+  //   else{
+  //     Serial.println("Already playing");
+  //   }
+  //   delay(1);
+  // }
+
+  //  Serial.println("Hi Sound");
+
+  justWokeUp = true;
+  triggerBtn.pressed = true;
   attachInterrupt(triggerBtn.PIN, ButtonTask, CHANGE);
 
-  FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS); // GRB ordering is typical
+  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS); // GRB ordering is typical
+  leds[0] = CRGB::Blue;                                    // indicate power On
+  FastLED.show();
 
   print_wakeup_reason();
 
