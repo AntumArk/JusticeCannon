@@ -45,14 +45,14 @@ void StartEffects()
         &audioTaskHandle,
         1);
   }
-    xTaskCreatePinnedToCore(
-        PlayLeds,
-        "Play leds",
-        4096,
-        nullptr,
-        2,
-        &ledTaskHandle,
-        0);
+  xTaskCreatePinnedToCore(
+      PlayLeds,
+      "Play leds",
+      4096,
+      nullptr,
+      2,
+      &ledTaskHandle,
+      0);
 }
 
 void PlayAudio(void *parameter)
@@ -64,7 +64,7 @@ void PlayAudio(void *parameter)
 
   while (LaserSound.Playing == true)
   {
-    //Serial.println("Playing Sound");
+    // Serial.println("Playing Sound");
     DacAudio.FillBuffer();
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
@@ -90,22 +90,23 @@ void PlayLeds(void *parameter)
   Serial.println("Led");
   Serial.println(taskCounter);
   taskCounter++;
-  if(taskCounter==1){
-  PlayLedBoot();
-  PlayLedShoot();
-  // play it, this will cause it to repeat and repeat...
-  // Turn the LED on, then pause
-  for (size_t i = 0; i < NUM_LEDS; i++)
+  if (taskCounter == 1)
   {
-    leds[i] = CRGB::Red;
-    FastLED.show();
-    vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
-    // Now turn the LED off, then pause
-    leds[i] = CRGB::Black;
-    FastLED.show();
-    vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
-  }
-  //ledTaskHandle == nullptr;
+    PlayLedBoot();
+    PlayLedShoot();
+    // play it, this will cause it to repeat and repeat...
+    // Turn the LED on, then pause
+    for (size_t i = 0; i < NUM_LEDS; i++)
+    {
+      leds[i] = CRGB::Red;
+      FastLED.show();
+      vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
+      // Now turn the LED off, then pause
+      leds[i] = CRGB::Black;
+      FastLED.show();
+      vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
+    }
+    // ledTaskHandle == nullptr;
   }
   vTaskDelay(10);
   taskCounter--;
@@ -127,21 +128,21 @@ void IRAM_ATTR ButtonTask()
   else
   {
 
-      // eTaskState ledState = eTaskGetState(ledTaskHandle);
-      // if (ledState != eDeleted && ledState != eInvalid)
-      // {
-      //   vTaskDelete(ledTaskHandle);
-        
-      // }
-      
+    // eTaskState ledState = eTaskGetState(ledTaskHandle);
+    // if (ledState != eDeleted && ledState != eInvalid)
+    // {
+    //   vTaskDelete(ledTaskHandle);
+
+    // }
+
     // Serial.println("Ending Sound");
     DacAudio.StopAllSounds();
-  //   for (size_t i = 0; i < NUM_LEDS; i++)
-  // {
-  //   // Now turn the LED off, then pause
-  //   leds[i] = CRGB::Black;
-  //   FastLED.show();
-  // }
+    //   for (size_t i = 0; i < NUM_LEDS; i++)
+    // {
+    //   // Now turn the LED off, then pause
+    //   leds[i] = CRGB::Black;
+    //   FastLED.show();
+    // }
   }
 }
 
