@@ -1,23 +1,15 @@
-#include <Arduino.h>
-#include "laser.h"
-#include "glitch.h"
-#include "XT_DAC_Audio.h"
-#include <FastLED.h>
 
+#include "main.hpp"
+
+// Deep sleep parameters
 u_int32_t lastActivity = 0;
 u_int32_t sleepTimeout = 10000;
-// How many leds in your strip?
-#define NUM_LEDS 13
-
-// For led chips like WS2812, which have a data line, ground, and power, you just
-// need to define DATA_PIN.  For led chipsets that are SPI based (four wires - data, clock,
-// ground, and power), like the LPD8806 define both DATA_PIN and CLOCK_PIN
-// Clock pin only needed for SPI based chipsets when not using hardware SPI
-#define DATA_PIN 4
+bool justWokeUp = true;
 
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
+/* AUDIO */
 XT_Wav_Class LaserSound(laser_wav);   // create an object of type XT_Wav_Class that is used by
                                       // the dac audio class (below), passing wav data as parameter.
 XT_Wav_Class GlitchSound(glitch_wav); // create an object of type XT_Wav_Class that is used by
@@ -25,8 +17,139 @@ XT_Wav_Class GlitchSound(glitch_wav); // create an object of type XT_Wav_Class t
 XT_DAC_Audio_Class DacAudio(25, 0);   // Create the main player class object.
                                       // Use GPIO 25, one of the 2 DAC pins and timer 0
 
-uint32_t DemoCounter = 0; // Just a counter to use in the serial monitor
-                          // not essential to playing the sound
+Button triggerBtn = {GPIO_NUM_32, 0, false};
+
+/* Tasks */
+TaskHandle_t audioTaskHandle = nullptr;
+TaskHandle_t ledTaskHandle = nullptr;
+u_int32_t taskCount = 0;
+
+/* Prototypes */
+void StartEffects();
+void PlayAudio(void *parameter);
+void PlayLedBoot();
+void PlayLedShoot();
+void PlayLeds(void *parameter);
+void print_wakeup_reason();
+/* Functions */
+
+void StartEffects()
+{
+
+  // xTaskCreatePinnedToCore(
+  //     PlayAudio,
+  //     "Play audio",
+  //     10000,
+  //     nullptr,
+  //     1,
+  //     &audioTaskHandle,
+  //     1);
+  if (ledTaskHandle == nullptr)
+  {
+    xTaskCreatePinnedToCore(
+        PlayLeds,
+        "Play leds",
+        4096,
+        nullptr,
+        2,
+        &ledTaskHandle,
+        0);
+  }
+}
+
+void PlayAudio(void *parameter)
+{
+
+  Serial.println("Starting Sound");
+  taskCount++;
+  Serial.println(taskCount);
+  DacAudio.FillBuffer();
+  if (LaserSound.Playing == false) // OLaserSound.Playing ) //
+  {
+    Serial.println("Playing Sound");
+    DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
+    DacAudio.Play(&GlitchSound, true);
+    vTaskDelay(10); /// portTICK_PERIOD_MS);
+  }
+
+  Serial.println("Ending Sound");
+  DacAudio.StopAllSounds();
+
+  // When you're done, call vTaskDelete. Don't forget this!
+  vTaskDelete(nullptr);
+}
+
+void PlayLedBoot()
+{
+}
+
+void PlayLedShoot()
+{
+}
+
+void PlayLeds(void *parameter)
+{
+  PlayLedBoot();
+  PlayLedShoot();
+  // play it, this will cause it to repeat and repeat...
+  // Turn the LED on, then pause
+  for (size_t i = 0; i < NUM_LEDS; i++)
+  {
+    leds[i] = CRGB::Red;
+    FastLED.show();
+    vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
+    // Now turn the LED off, then pause
+    leds[i] = CRGB::Black;
+    FastLED.show();
+    vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
+  }
+  // When you're done, call vTaskDelete. Don't forget this!
+  vTaskDelete(nullptr);
+}
+
+void IRAM_ATTR ButtonTask()
+{
+
+  triggerBtn.numberKeyPresses++;
+  triggerBtn.pressed = !triggerBtn.pressed || justWokeUp; // Switch so it would disable tasks on let go
+  justWokeUp = false;
+  if (triggerBtn.pressed)
+  {
+    StartEffects();
+    lastActivity = millis();
+  }
+  else
+  {
+    // Stop tasks
+    // vTaskDelete(audioTaskHandle);
+    if (ledTaskHandle != nullptr)
+    {
+      eTaskState ledState = eTaskGetState(ledTaskHandle);
+      if(ledState!=eDeleted)
+        {
+          vTaskDelete(ledTaskHandle);
+          ledTaskHandle = nullptr;
+        }
+    }
+    // Serial.println("Ending Sound");
+    //  DacAudio.StopAllSounds();
+  }
+}
+
+void SleepTask(void *parameter)
+{
+  while (true)
+  {
+    if ((millis() - lastActivity) > sleepTimeout)
+    {
+      esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1); // 1 = High, 0 = Low
+      Serial.println("Going to sleep");
+      esp_deep_sleep_start();
+      vTaskDelete(nullptr);
+    }
+    vTaskDelay(100 / portTICK_PERIOD_MS);
+  }
+}
 /*
 Method to print the reason by which ESP32
 has been awaken from sleep
@@ -64,91 +187,24 @@ void setup()
 {
   Serial.begin(115200); // Not needed for sound, just to demo printing to the serial
   delay(1000);
-  pinMode(GPIO_NUM_32, INPUT);
-  // Monitor whilst the sound plays, ensure your serial monitor
-  // speed is set to this speed also.
-  // Uncomment/edit one of the following lines for your leds arrangement.
-  // ## Clockless types ##
-  //FastLED.addLeds<NEOPIXEL, DATA_PIN>(leds, NUM_LEDS); // GRB ordering is assumed
-  // FastLED.addLeds<SM16703, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1829, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1812, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1809, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1804, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<TM1803, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1903, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1903B, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS1904, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<UCS2903, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2812, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2852, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<GS1903, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SK6812, DATA_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<SK6822, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<APA106, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<PL9823, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SK6822, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2811, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2813, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<APA104, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2811_400, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GE8822, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GW6205, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<GW6205_400, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<LPD1886, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<LPD1886_8BIT, DATA_PIN, RGB>(leds, NUM_LEDS);
-  // ## Clocked (SPI) types ##
-  // FastLED.addLeds<LPD6803, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<LPD8806, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // GRB ordering is typical
-  // FastLED.addLeds<WS2801, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<WS2803, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<SM16716, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);
-  // FastLED.addLeds<P9813, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<DOTSTAR, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<APA102, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
-  // FastLED.addLeds<SK9822, DATA_PIN, CLOCK_PIN, RGB>(leds, NUM_LEDS);  // BGR ordering is typical
+  justWokeUp = true;
+
+  attachInterrupt(triggerBtn.PIN, ButtonTask, CHANGE);
+
+  FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS); // GRB ordering is typical
+
   print_wakeup_reason();
+
+  xTaskCreate(
+      SleepTask,
+      "Wait for sleep",
+      4096,
+      nullptr,
+      1,
+      nullptr);
 }
 
 void loop()
 {
-
-  if ((millis() - lastActivity) > sleepTimeout)
-  {
-    esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1); // 1 = High, 0 = Low
-    Serial.println("Going to sleep");
-    esp_deep_sleep_start();
-  }
-
-  if (digitalRead(GPIO_NUM_32))
-  {
-      // initialize the x/y and time values
-  // random16_set_seed(8934);
-  // random16_add_entropy(analogRead(3));
-
-
-    lastActivity = millis();
-    DacAudio.FillBuffer();           // Fill the sound buffer with data
-    if (LaserSound.Playing == false) // if not playing,
-    {
-      DacAudio.Play(&LaserSound); //                play it, this will cause it to repeat and repeat...
-      DacAudio.Play(&GlitchSound, true);
-    } //                play it, this will cause it to repeat and repeat...
-    // Turn the LED on, then pause
-    for (size_t i = 0; i < NUM_LEDS; i++)
-    {
-      leds[i] = CRGB::Cyan;
-      FastLED.show();
-      delay(50);
-      // Now turn the LED off, then pause
-      leds[i] = CRGB::Black;
-      FastLED.show();
-      delay(50);
-    }
-  }
-  else
-  {
-    DacAudio.StopAllSounds();
-  }
+  vTaskDelay(100000 / portTICK_PERIOD_MS);
 }
