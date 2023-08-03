@@ -22,7 +22,7 @@ Button triggerBtn = {GPIO_NUM_32, 0, false};
 /* Tasks */
 TaskHandle_t audioTaskHandle = nullptr;
 TaskHandle_t ledTaskHandle = nullptr;
-
+volatile u_int32_t taskCounter = 0;
 /* Prototypes */
 void StartEffects();
 void PlayAudio(void *parameter);
@@ -45,8 +45,6 @@ void StartEffects()
         &audioTaskHandle,
         1);
   }
-  if (ledTaskHandle == nullptr)
-  {
     xTaskCreatePinnedToCore(
         PlayLeds,
         "Play leds",
@@ -55,7 +53,6 @@ void StartEffects()
         2,
         &ledTaskHandle,
         0);
-  }
 }
 
 void PlayAudio(void *parameter)
@@ -67,7 +64,7 @@ void PlayAudio(void *parameter)
 
   while (LaserSound.Playing == true)
   {
-    Serial.println("Playing Sound");
+    //Serial.println("Playing Sound");
     DacAudio.FillBuffer();
     vTaskDelay(1 / portTICK_PERIOD_MS);
   }
@@ -90,6 +87,10 @@ void PlayLedShoot()
 
 void PlayLeds(void *parameter)
 {
+  Serial.println("Led");
+  Serial.println(taskCounter);
+  taskCounter++;
+  if(taskCounter==1){
   PlayLedBoot();
   PlayLedShoot();
   // play it, this will cause it to repeat and repeat...
@@ -104,6 +105,10 @@ void PlayLeds(void *parameter)
     FastLED.show();
     vTaskDelay((100 / portTICK_PERIOD_MS) / (i * i + 1));
   }
+  //ledTaskHandle == nullptr;
+  }
+  vTaskDelay(10);
+  taskCounter--;
   // When you're done, call vTaskDelete. Don't forget this!
   vTaskDelete(nullptr);
 }
@@ -121,19 +126,22 @@ void IRAM_ATTR ButtonTask()
   }
   else
   {
-    // Stop tasks
-    // vTaskDelete(audioTaskHandle);
-    // if (ledTaskHandle != nullptr)
-    // {
-    //   eTaskState ledState = eTaskGetState(ledTaskHandle);
-    //   if (ledState != eDeleted)
-    //   {
-    //     vTaskDelete(ledTaskHandle);
-    //     ledTaskHandle = nullptr;
-    //   }
-    // }
+
+      // eTaskState ledState = eTaskGetState(ledTaskHandle);
+      // if (ledState != eDeleted && ledState != eInvalid)
+      // {
+      //   vTaskDelete(ledTaskHandle);
+        
+      // }
+      
     // Serial.println("Ending Sound");
     DacAudio.StopAllSounds();
+  //   for (size_t i = 0; i < NUM_LEDS; i++)
+  // {
+  //   // Now turn the LED off, then pause
+  //   leds[i] = CRGB::Black;
+  //   FastLED.show();
+  // }
   }
 }
 
