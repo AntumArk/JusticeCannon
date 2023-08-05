@@ -1,10 +1,7 @@
 #pragma once
 #include <Arduino.h>
-#include "laser.h"
-#include "glitch.h"
-#include "XT_DAC_Audio.h"
 #include <FastLED.h>
-
+#include "gunAudio.hpp"
 
 struct Button
 {

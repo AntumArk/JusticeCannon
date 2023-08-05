@@ -9,23 +9,14 @@ bool justWokeUp = true;
 // Define the array of leds
 CRGB leds[NUM_LEDS];
 
-/* AUDIO */
-XT_Wav_Class LaserSound(laser_wav);   // create an object of type XT_Wav_Class that is used by
-                                      // the dac audio class (below), passing wav data as parameter.
-XT_Wav_Class GlitchSound(glitch_wav); // create an object of type XT_Wav_Class that is used by
-                                      // the dac audio class (below), passing wav data as parameter.
-XT_DAC_Audio_Class DacAudio(25, 0);   // Create the main player class object.
-                                      // Use GPIO 25, one of the 2 DAC pins and timer 0
-
 Button triggerBtn = {GPIO_NUM_32, 0, false};
 
 /* Tasks */
-TaskHandle_t audioTaskHandle = nullptr;
 TaskHandle_t ledTaskHandle = nullptr;
 volatile u_int32_t taskCounter = 0;
 /* Prototypes */
 void StartEffects();
-void PlayAudio(void *parameter);
+
 void PlayLedBoot();
 void PlayLedShoot();
 void PlayLeds(void *parameter);
@@ -34,17 +25,7 @@ void print_wakeup_reason();
 
 void StartEffects()
 {
-  if (audioTaskHandle == nullptr)
-  {
-    xTaskCreatePinnedToCore(
-        PlayAudio,
-        "Play audio",
-        10000,
-        nullptr,
-        1,
-        &audioTaskHandle,
-        1);
-  }
+  StartAudioTask();
   xTaskCreatePinnedToCore(
       PlayLeds,
       "Play leds",
@@ -53,28 +34,6 @@ void StartEffects()
       2,
       &ledTaskHandle,
       0);
-}
-
-void PlayAudio(void *parameter)
-{
-  Serial.println("Starting Sound");
-  DacAudio.FillBuffer();
-  DacAudio.Play(&LaserSound);
-  DacAudio.Play(&GlitchSound, true);
-
-  while (LaserSound.Playing == true)
-  {
-    // Serial.println("Playing Sound");
-    DacAudio.FillBuffer();
-    vTaskDelay(1 / portTICK_PERIOD_MS);
-  }
-
-  Serial.println("Ending Sound");
-  DacAudio.StopAllSounds();
-
-  audioTaskHandle = nullptr;
-  // When you're done, call vTaskDelete. Don't forget this!
-  vTaskDelete(nullptr);
 }
 
 void ClearLeds()
@@ -99,7 +58,7 @@ void PlayLedBoot()
     {
       uint8_t brigntessDivisor = random(1, 5);
       uint8_t colorVarience = random(0, 50);
-      leds[i] = CRGB(35 / brigntessDivisor+colorVarience, 152 / brigntessDivisor+colorVarience, 176 / brigntessDivisor+colorVarience)*random(0,2);
+      leds[i] = CRGB(35 / brigntessDivisor + colorVarience, 152 / brigntessDivisor + colorVarience, 176 / brigntessDivisor + colorVarience) * random(0, 2);
       FastLED.show();
     }
     vTaskDelay(cycleDelay / portTICK_PERIOD_MS);
@@ -122,7 +81,7 @@ void PlayLedShoot()
   }
 
   uint16_t powerDownTime = 200;
-  for (size_t j = 255; j>0; j--)
+  for (size_t j = 255; j > 0; j--)
   {
     FastLED.setBrightness(j);
     FastLED.show();
@@ -159,22 +118,7 @@ void IRAM_ATTR ButtonTask()
   }
   else
   {
-
-    // eTaskState ledState = eTaskGetState(ledTaskHandle);
-    // if (ledState != eDeleted && ledState != eInvalid)
-    // {
-    //   vTaskDelete(ledTaskHandle);
-
-    // }
-
-    // Serial.println("Ending Sound");
-    DacAudio.StopAllSounds();
-    //   for (size_t i = 0; i < NUM_LEDS; i++)
-    // {
-    //   // Now turn the LED off, then pause
-    //   leds[i] = CRGB::Black;
-    //   FastLED.show();
-    // }
+    StopAudio();
   }
 }
 
@@ -242,7 +186,7 @@ void setup()
   attachInterrupt(triggerBtn.PIN, ButtonTask, CHANGE);
 
   FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS); // GRB ordering is typical
-  leds[0] = CRGB::PaleVioletRed;                                    // indicate power On
+  leds[0] = CRGB::PaleVioletRed;                           // indicate power On
   FastLED.show();
 
   print_wakeup_reason();
