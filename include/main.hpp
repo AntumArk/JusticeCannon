@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "ledEffects.hpp"
 #include "gunAudio.hpp"
+#include "sleepTask.hpp"
 
 struct Button
 {
