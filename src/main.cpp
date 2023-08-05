@@ -6,103 +6,20 @@ u_int32_t lastActivity = 0;
 u_int32_t sleepTimeout = 10000;
 bool justWokeUp = true;
 
-// Define the array of leds
-CRGB leds[NUM_LEDS];
-
 Button triggerBtn = {GPIO_NUM_32, 0, false};
 
 /* Tasks */
-TaskHandle_t ledTaskHandle = nullptr;
-volatile u_int32_t taskCounter = 0;
+
 /* Prototypes */
 void StartEffects();
 
-void PlayLedBoot();
-void PlayLedShoot();
-void PlayLeds(void *parameter);
 void print_wakeup_reason();
 /* Functions */
 
 void StartEffects()
 {
   StartAudioTask();
-  xTaskCreatePinnedToCore(
-      PlayLeds,
-      "Play leds",
-      4096,
-      nullptr,
-      2,
-      &ledTaskHandle,
-      0);
-}
-
-void ClearLeds()
-{
-  for (size_t i = 0; i < NUM_LEDS; i++)
-  {
-    leds[i] = CRGB::Black;
-    FastLED.show();
-  }
-}
-void PlayLedBoot()
-{
-  FastLED.setBrightness(255);
-  pinMode(GPIO_NUM_33, INPUT);
-  randomSeed(analogRead(GPIO_NUM_33));
-  uint8_t cyclesToTrigger = random(5, 10);
-  uint8_t cycleDelay = random(30, 100);
-  for (size_t i = 0; i < cyclesToTrigger; i++)
-  {
-    ClearLeds();
-    for (size_t i = 0; i < NUM_LEDS; i++)
-    {
-      uint8_t brigntessDivisor = random(1, 5);
-      uint8_t colorVarience = random(0, 50);
-      leds[i] = CRGB(35 / brigntessDivisor + colorVarience, 152 / brigntessDivisor + colorVarience, 176 / brigntessDivisor + colorVarience) * random(0, 2);
-      FastLED.show();
-    }
-    vTaskDelay(cycleDelay / portTICK_PERIOD_MS);
-  }
-  ClearLeds();
-}
-
-void PlayLedShoot()
-{
-  uint16_t shootTime = 6000;
-  for (size_t j = 0; j < 255; j++)
-  {
-    for (size_t i = 0; i < NUM_LEDS; i++)
-    {
-      leds[i] = CRGB::LimeGreen;
-    }
-    FastLED.setBrightness(j);
-    FastLED.show();
-    vTaskDelay((shootTime / 255) / portTICK_PERIOD_MS);
-  }
-
-  uint16_t powerDownTime = 200;
-  for (size_t j = 255; j > 0; j--)
-  {
-    FastLED.setBrightness(j);
-    FastLED.show();
-    vTaskDelay((powerDownTime / 255) / portTICK_PERIOD_MS);
-  }
-}
-
-void PlayLeds(void *parameter)
-{
-  Serial.println("Led");
-  Serial.println(taskCounter);
-  taskCounter++;
-  if (taskCounter == 1)
-  {
-    PlayLedBoot();
-    PlayLedShoot();
-  }
-  vTaskDelay(10);
-  taskCounter--;
-  // When you're done, call vTaskDelete. Don't forget this!
-  vTaskDelete(nullptr);
+  CreateLedTask();
 }
 
 void IRAM_ATTR ButtonTask()
@@ -130,12 +47,7 @@ void SleepTask(void *parameter)
     {
       esp_sleep_enable_ext0_wakeup(GPIO_NUM_32, 1); // 1 = High, 0 = Low
       Serial.println("Going to sleep");
-      for (size_t i = 0; i < NUM_LEDS; i++)
-      {
-        // Now turn the LED off, then pause
-        leds[i] = CRGB::Black;
-        FastLED.show();
-      }
+      ClearLeds();
       esp_deep_sleep_start();
       vTaskDelete(nullptr);
     }
@@ -185,9 +97,7 @@ void setup()
   triggerBtn.pressed = true;
   attachInterrupt(triggerBtn.PIN, ButtonTask, CHANGE);
 
-  FastLED.addLeds<WS2812B, DATA_PIN, RGB>(leds, NUM_LEDS); // GRB ordering is typical
-  leds[0] = CRGB::PaleVioletRed;                           // indicate power On
-  FastLED.show();
+  SetUpLeds();
 
   print_wakeup_reason();
 

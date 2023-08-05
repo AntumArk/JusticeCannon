@@ -1,6 +1,6 @@
 #pragma once
 #include <Arduino.h>
-#include <FastLED.h>
+#include "ledEffects.hpp"
 #include "gunAudio.hpp"
 
 struct Button
@@ -9,9 +9,3 @@ struct Button
   uint32_t numberKeyPresses;
   bool pressed;
 };
-
-// How many leds in your strip?
-#define NUM_LEDS 13
-
-// LED Data pin
-#define DATA_PIN 4
