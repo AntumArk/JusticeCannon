@@ -1,3 +1,19 @@
+# Introduction
+This repository is for cosplay piece. This also can be used as a base for other light and sound based ESP32 projects.
+
+It contains hardware:
+- ESP32
+- Audio amplifier with speaker
+- WS2815 led strip
+- 2s Li-on battery
+
+Software features:
+- Two custom lighting effects
+- Deep sleep
+- Button interrupt
+- FreeRtos task handling for audio and light effects parallelizm
+- Sound effects
+
 # Sources
 
 <https://www.printables.com/model/342546-destiny-2-judgement-hand-cannon/comments#preview>
